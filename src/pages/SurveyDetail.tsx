@@ -5,6 +5,7 @@ import { Shield, Star, ArrowLeft, Send, CheckCircle, Eye } from "lucide-react";
 import { useStore } from "@/store";
 import { allTags, tagColors } from "@/data/mock";
 import { formatDate } from "@/utils/format";
+import { hasUserSubmittedSurvey, getUserSubmissionRecord } from "@/utils/anonymousStorage";
 import type { Answer } from "@/types";
 
 export default function SurveyDetail() {
@@ -13,19 +14,16 @@ export default function SurveyDetail() {
   const currentUser = useStore((s) => s.currentUser);
   const surveys = useStore((s) => s.surveys);
   const submitFeedback = useStore((s) => s.submitFeedback);
-  const hasEmployeeSubmittedSurvey = useStore((s) => s.hasEmployeeSubmittedSurvey);
   const survey = surveys.find((s) => s.id === id);
 
   const hasSubmitted =
     currentUser?.role === "employee" && id
-      ? hasEmployeeSubmittedSurvey(currentUser.id, id)
+      ? hasUserSubmittedSurvey(currentUser.id, id)
       : false;
 
   const submissionRecord = currentUser?.role === "employee" && id
-    ? useStore.getState().employeeSubmissionRecords.find(
-        (r) => r.employeeId === currentUser.id && r.surveyId === id
-      )
-    : null;
+    ? getUserSubmissionRecord(currentUser.id, id)
+    : undefined;
 
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [selectedTags, setSelectedTags] = useState<string[]>([]);

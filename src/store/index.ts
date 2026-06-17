@@ -5,19 +5,18 @@ import type {
   Survey,
   Submission,
   Question,
-  EmployeeSubmissionRecord,
   SentReport,
   QuarterlyReport,
   ThemeTopic,
 } from "@/types";
 import { mockUsers, mockSurveys, mockSubmissions, allTags } from "@/data/mock";
 import { filterText } from "@/utils/keywordFilter";
-import { generateId, getQuarterLabel } from "@/utils/format";
+import { generateId } from "@/utils/format";
+import { markSurveySubmitted } from "@/utils/anonymousStorage";
 
 interface PersistState {
   surveys: Survey[];
   submissions: Submission[];
-  employeeSubmissionRecords: EmployeeSubmissionRecord[];
   sentReports: SentReport[];
 }
 
@@ -41,8 +40,6 @@ interface AppState extends PersistState {
     tags: string[];
   }) => { success: boolean; flagged: boolean; matchedKeywords: string[] };
 
-  hasEmployeeSubmittedSurvey: (employeeId: string, surveyId: string) => boolean;
-
   reviewSubmission: (id: string, action: "approve" | "reject", reason?: string) => void;
   replyToSubmission: (id: string, reply: string) => void;
 
@@ -62,14 +59,6 @@ function getInitialDemoData(): PersistState {
   return {
     surveys: JSON.parse(JSON.stringify(mockSurveys)),
     submissions: JSON.parse(JSON.stringify(mockSubmissions)),
-    employeeSubmissionRecords: [
-      { id: "esr1", employeeId: "u2", surveyId: "s1", submittedAt: "2026-04-05T14:30:00Z" },
-      { id: "esr2", employeeId: "u2", surveyId: "s2", submittedAt: "2026-05-20T11:20:00Z" },
-      { id: "esr3", employeeId: "u3", surveyId: "s1", submittedAt: "2026-04-08T09:15:00Z" },
-      { id: "esr4", employeeId: "u3", surveyId: "s3", submittedAt: "2026-01-15T10:30:00Z" },
-      { id: "esr5", employeeId: "u4", surveyId: "s2", submittedAt: "2026-05-22T15:00:00Z" },
-      { id: "esr6", employeeId: "u4", surveyId: "s3", submittedAt: "2026-02-10T13:00:00Z" },
-    ],
     sentReports: [],
   };
 }
@@ -173,32 +162,18 @@ export const useStore = create<AppState>()(
         };
 
         const currentUser = get().currentUser;
-        const newRecord: EmployeeSubmissionRecord | null =
-          currentUser && currentUser.role === "employee"
-            ? {
-                id: "esr" + generateId(),
-                employeeId: currentUser.id,
-                surveyId: data.surveyId,
-                submittedAt: new Date().toISOString(),
-              }
-            : null;
+        if (currentUser && currentUser.role === "employee") {
+          markSurveySubmitted(currentUser.id, data.surveyId);
+        }
 
         set((state) => ({
           submissions: [...state.submissions, submission],
           surveys: state.surveys.map((s) =>
             s.id === data.surveyId ? { ...s, responseCount: s.responseCount + 1 } : s
           ),
-          employeeSubmissionRecords: newRecord
-            ? [...state.employeeSubmissionRecords, newRecord]
-            : state.employeeSubmissionRecords,
         }));
 
         return { success: true, flagged, matchedKeywords };
-      },
-
-      hasEmployeeSubmittedSurvey: (employeeId: string, surveyId: string) => {
-        const records = get().employeeSubmissionRecords;
-        return records.some((r) => r.employeeId === employeeId && r.surveyId === surveyId);
       },
 
       reviewSubmission: (id, action, _reason) => {
@@ -344,7 +319,7 @@ export const useStore = create<AppState>()(
             }
           }
 
-          for (const [keywordGroup, cluster] of clusters.entries()) {
+          for (const [_keywordGroup, cluster] of clusters.entries()) {
             if (cluster.count > 0) {
               const replyCount = cluster.ids.filter((id) => {
                 const sub = visibleSubs.find((s) => s.id === id);
@@ -371,7 +346,6 @@ export const useStore = create<AppState>()(
         set({
           surveys: demo.surveys,
           submissions: demo.submissions,
-          employeeSubmissionRecords: demo.employeeSubmissionRecords,
           sentReports: demo.sentReports,
         });
       },
@@ -382,7 +356,6 @@ export const useStore = create<AppState>()(
       partialize: (state) => ({
         surveys: state.surveys,
         submissions: state.submissions,
-        employeeSubmissionRecords: state.employeeSubmissionRecords,
         sentReports: state.sentReports,
       }),
     }

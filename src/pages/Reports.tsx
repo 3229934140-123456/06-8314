@@ -16,6 +16,10 @@ import {
   ChevronDown,
   ChevronUp,
   Send,
+  FileText,
+  Tag,
+  BarChart2,
+  AlertTriangle,
 } from "lucide-react";
 import {
   LineChart,
@@ -239,12 +243,15 @@ export default function Reports() {
     setTimeout(() => setToast({ show: false, message: "" }), 3000);
   };
 
+  const [expandedReport, setExpandedReport] = useState<string | null>(null);
+
   const renderReportCard = (report: SentReport, index: number) => {
     const { reportData } = report;
     const recipientsText = report.recipients.map((r) => r.name).join(", ");
     const truncatedRecipients = recipientsText.length > 50
       ? recipientsText.substring(0, 50) + "..."
       : recipientsText;
+    const isExpanded = expandedReport === report.id;
 
     return (
       <motion.div
@@ -255,8 +262,11 @@ export default function Reports() {
         transition={{ delay: index * 0.08 }}
         className="rounded-xl border border-white/5 bg-[#0f0f23] p-5"
       >
-        <div className="flex items-start justify-between">
-          <div>
+        <div
+          className="flex items-start justify-between cursor-pointer"
+          onClick={() => setExpandedReport(isExpanded ? null : report.id)}
+        >
+          <div className="flex-1">
             <div className="flex items-center gap-3">
               <h3 className="text-lg font-semibold text-white">{report.year} {report.quarter}</h3>
               <span className="flex items-center gap-1 rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-medium text-green-400">
@@ -265,6 +275,14 @@ export default function Reports() {
               </span>
             </div>
             <p className="mt-1 text-sm text-gray-500">{formatDate(report.sentAt)}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">{isExpanded ? "收起" : "查看详情"}</span>
+            {isExpanded ? (
+              <ChevronUp className="h-5 w-5 text-gray-500" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-gray-500" />
+            )}
           </div>
         </div>
 
@@ -307,6 +325,147 @@ export default function Reports() {
             </div>
           </div>
         </div>
+
+        <AnimatePresence>
+          {isExpanded && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25 }}
+              className="overflow-hidden"
+            >
+              <div className="mt-5 space-y-5 border-t border-white/5 pt-5">
+                <div className="rounded-lg bg-black/20 p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Tag className="h-4 w-4 text-amber-400" />
+                    <h4 className="text-sm font-semibold text-white">标签分布（Top 10）</h4>
+                  </div>
+                  {reportData.topTags.length === 0 ? (
+                    <p className="py-4 text-center text-xs text-gray-500">暂无标签数据</p>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {reportData.topTags.slice(0, 10).map((item, i) => (
+                        <div key={item.tag} className="flex items-center gap-3">
+                          <span className="w-5 text-right text-xs font-medium text-gray-500">{i + 1}</span>
+                          <span
+                            className="h-2 w-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: tagColors[item.tag] || "#6b7280" }}
+                          />
+                          <span className="w-20 text-sm text-gray-300">{item.tag}</span>
+                          <div className="relative h-5 flex-1 overflow-hidden rounded bg-white/5">
+                            <div
+                              className="absolute inset-y-0 left-0 rounded"
+                              style={{
+                                width: `${item.percentage}%`,
+                                backgroundColor: tagColors[item.tag] || "#6b7280",
+                                opacity: 0.6,
+                              }}
+                            />
+                          </div>
+                          <span className="w-8 text-right text-sm font-medium text-gray-300">{item.count}</span>
+                          <span className="w-10 text-right text-xs text-gray-500">{item.percentage}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-lg bg-black/20 p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <BarChart2 className="h-4 w-4 text-amber-400" />
+                    <h4 className="text-sm font-semibold text-white">月度趋势</h4>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-white/5">
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">月份</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">总数</th>
+                          {Object.keys(tagColors).slice(0, 6).map((tag) => (
+                            <th key={tag} className="px-3 py-2 text-right text-xs font-medium" style={{ color: tagColors[tag] }}>
+                              {tag}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportData.monthlyTrend.map((entry) => (
+                          <tr key={entry.month} className="border-b border-white/5 last:border-0">
+                            <td className="px-3 py-2 text-gray-300">{entry.month}</td>
+                            <td className="px-3 py-2 text-right font-medium text-white">{entry.count}</td>
+                            {Object.keys(tagColors).slice(0, 6).map((tag) => (
+                              <td key={tag} className="px-3 py-2 text-right text-gray-400">
+                                {entry.byTag[tag] || 0}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4">
+                    <div className="mb-2 flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-yellow-400" />
+                      <h4 className="text-sm font-semibold text-yellow-300">待审核内容</h4>
+                    </div>
+                    <p className="text-3xl font-bold text-yellow-400">{reportData.pendingReviewSubmissions}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {reportData.pendingReviewSubmissions > 0
+                        ? "需管理员审核后公开到意见广场"
+                        : "本季度无待审核内容"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
+                    <div className="mb-2 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-red-400" />
+                      <h4 className="text-sm font-semibold text-red-300">已拒绝内容</h4>
+                    </div>
+                    <p className="text-3xl font-bold text-red-400">{reportData.rejectedSubmissions}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {reportData.rejectedSubmissions > 0
+                        ? "已被管理员判定为违规并永久屏蔽"
+                        : "本季度无被拒绝的内容"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-green-400" />
+                    <h4 className="text-sm font-semibold text-green-300">标签数量明细</h4>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {reportData.categoryBreakdown.length === 0 ? (
+                      <span className="text-xs text-gray-500">暂无数据</span>
+                    ) : (
+                      reportData.categoryBreakdown.map((item) => (
+                        <span
+                          key={item.tag}
+                          className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs"
+                          style={{
+                            borderColor: tagColors[item.tag] || "#6b7280",
+                            color: tagColors[item.tag] || "#6b7280",
+                          }}
+                        >
+                          <span
+                            className="h-1.5 w-1.5 rounded-full"
+                            style={{ backgroundColor: tagColors[item.tag] || "#6b7280" }}
+                          />
+                          {item.tag} · {item.count}条
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     );
   };
