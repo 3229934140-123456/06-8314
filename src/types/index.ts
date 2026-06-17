@@ -51,6 +51,13 @@ export interface Submission {
   adminReply?: string;
   repliedAt?: string;
   matchedKeywords?: string[];
+  auditLog: AuditLogEntry[];
+}
+
+export interface AuditLogEntry {
+  action: "submitted" | "approved" | "rejected" | "replied";
+  timestamp: string;
+  detail?: string;
 }
 
 export interface BlockedKeyword {

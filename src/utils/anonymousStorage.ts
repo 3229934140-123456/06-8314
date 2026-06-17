@@ -1,59 +1,72 @@
-export interface AnonymousSubmissionRecord {
-  surveyId: string;
-  submittedAt: string;
+const APP_SECRET = "anon_voice_2026";
+const STORAGE_PREFIX = "av_";
+
+async function sha256(input: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function getStorageKey(userId: string): string {
-  return `anon_sub_${userId}`;
-}
-
-function readAll(userId: string): AnonymousSubmissionRecord[] {
+function getStoredSet(key: string): Set<string> {
   try {
-    const raw = localStorage.getItem(getStorageKey(userId));
-    if (!raw) return [];
+    const raw = localStorage.getItem(key);
+    if (!raw) return new Set();
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed;
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed);
   } catch {
-    return [];
+    return new Set();
   }
 }
 
-function writeAll(userId: string, records: AnonymousSubmissionRecord[]): void {
+function writeSet(key: string, set: Set<string>): void {
   try {
-    localStorage.setItem(getStorageKey(userId), JSON.stringify(records));
+    localStorage.setItem(key, JSON.stringify([...set]));
   } catch {
     // ignore
   }
 }
 
-export function markSurveySubmitted(userId: string, surveyId: string): void {
+export async function markSurveySubmitted(userId: string, surveyId: string): Promise<void> {
   if (typeof window === "undefined") return;
-  const records = readAll(userId);
-  if (records.some((r) => r.surveyId === surveyId)) return;
-  records.push({
-    surveyId,
-    submittedAt: new Date().toISOString(),
-  });
-  writeAll(userId, records);
+  const hash = await sha256(APP_SECRET + userId);
+  const storageKey = STORAGE_PREFIX + hash;
+  const set = getStoredSet(storageKey);
+  set.add(surveyId);
+  writeSet(storageKey, set);
 }
 
-export function hasUserSubmittedSurvey(userId: string, surveyId: string): boolean {
+export async function hasUserSubmittedSurvey(userId: string, surveyId: string): Promise<boolean> {
   if (typeof window === "undefined") return false;
-  const records = readAll(userId);
-  return records.some((r) => r.surveyId === surveyId);
+  const hash = await sha256(APP_SECRET + userId);
+  const storageKey = STORAGE_PREFIX + hash;
+  const set = getStoredSet(storageKey);
+  return set.has(surveyId);
 }
 
-export function getUserSubmissionRecord(
+export async function getUserSubmissionTime(
   userId: string,
   surveyId: string
-): AnonymousSubmissionRecord | undefined {
+): Promise<string | undefined> {
   if (typeof window === "undefined") return undefined;
-  const records = readAll(userId);
-  return records.find((r) => r.surveyId === surveyId);
+  const hash = await sha256(APP_SECRET + userId + surveyId);
+  const timeKey = STORAGE_PREFIX + "t_" + hash;
+  return localStorage.getItem(timeKey) || undefined;
 }
 
-export function clearUserAnonymousRecords(userId: string): void {
+export async function markSurveySubmittedWithTime(
+  userId: string,
+  surveyId: string
+): Promise<void> {
   if (typeof window === "undefined") return;
-  localStorage.removeItem(getStorageKey(userId));
+  await markSurveySubmitted(userId, surveyId);
+  const timeHash = await sha256(APP_SECRET + userId + surveyId);
+  const timeKey = STORAGE_PREFIX + "t_" + timeHash;
+  try {
+    localStorage.setItem(timeKey, new Date().toISOString());
+  } catch {
+    // ignore
+  }
 }

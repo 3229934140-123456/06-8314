@@ -20,6 +20,8 @@ import {
   Tag,
   BarChart2,
   AlertTriangle,
+  Download,
+  X,
 } from "lucide-react";
 import {
   LineChart,
@@ -244,6 +246,47 @@ export default function Reports() {
   };
 
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
+  const [previewReport, setPreviewReport] = useState<SentReport | null>(null);
+
+  const reportTrendTags = useMemo(() => {
+    if (!previewReport) return [];
+    const tags = new Set<string>();
+    for (const entry of previewReport.reportData.monthlyTrend) {
+      for (const tag of Object.keys(entry.byTag)) {
+        tags.add(tag);
+      }
+    }
+    return [...tags].sort((a, b) => {
+      const aCount = previewReport.reportData.categoryBreakdown.find((c) => c.tag === a)?.count || 0;
+      const bCount = previewReport.reportData.categoryBreakdown.find((c) => c.tag === b)?.count || 0;
+      return bCount - aCount;
+    });
+  }, [previewReport]);
+
+  const handleExportReport = (report: SentReport) => {
+    const exportData = {
+      quarter: `${report.year} ${report.quarter}`,
+      sentAt: report.sentAt,
+      sentBy: report.sentBy,
+      recipients: report.recipients,
+      statistics: {
+        totalSubmissions: report.reportData.totalSubmissions,
+        reviewedSubmissions: report.reportData.reviewedSubmissions,
+        pendingReviewSubmissions: report.reportData.pendingReviewSubmissions,
+        rejectedSubmissions: report.reportData.rejectedSubmissions,
+      },
+      categoryBreakdown: report.reportData.categoryBreakdown,
+      monthlyTrend: report.reportData.monthlyTrend,
+      topTags: report.reportData.topTags,
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `report_${report.year}_Q${report.quarter.replace("Q", "")}_${new Date(report.sentAt).toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const renderReportCard = (report: SentReport, index: number) => {
     const { reportData } = report;
@@ -251,6 +294,20 @@ export default function Reports() {
     const truncatedRecipients = recipientsText.length > 50
       ? recipientsText.substring(0, 50) + "..."
       : recipientsText;
+    const trendTags = useMemo(() => {
+      const tags = new Set<string>();
+      for (const entry of reportData.monthlyTrend) {
+        for (const tag of Object.keys(entry.byTag)) {
+          tags.add(tag);
+        }
+      }
+      return [...tags].sort((a, b) => {
+        const aCount = reportData.categoryBreakdown.find((c) => c.tag === a)?.count || 0;
+        const bCount = reportData.categoryBreakdown.find((c) => c.tag === b)?.count || 0;
+        return bCount - aCount;
+      });
+    }, [reportData.monthlyTrend, reportData.categoryBreakdown]);
+
     const isExpanded = expandedReport === report.id;
 
     return (
@@ -277,6 +334,20 @@ export default function Reports() {
             <p className="mt-1 text-sm text-gray-500">{formatDate(report.sentAt)}</p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); setPreviewReport(report); }}
+              className="inline-flex items-center gap-1 rounded-md bg-blue-500/15 px-2.5 py-1 text-xs font-medium text-blue-400 transition-colors hover:bg-blue-500/25"
+            >
+              <FileText className="h-3 w-3" />
+              快照
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleExportReport(report); }}
+              className="inline-flex items-center gap-1 rounded-md bg-green-500/15 px-2.5 py-1 text-xs font-medium text-green-400 transition-colors hover:bg-green-500/25"
+            >
+              <Download className="h-3 w-3" />
+              导出
+            </button>
             <span className="text-xs text-gray-500">{isExpanded ? "收起" : "查看详情"}</span>
             {isExpanded ? (
               <ChevronUp className="h-5 w-5 text-gray-500" />
@@ -382,8 +453,8 @@ export default function Reports() {
                         <tr className="border-b border-white/5">
                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">月份</th>
                           <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">总数</th>
-                          {Object.keys(tagColors).slice(0, 6).map((tag) => (
-                            <th key={tag} className="px-3 py-2 text-right text-xs font-medium" style={{ color: tagColors[tag] }}>
+                          {trendTags.map((tag) => (
+                            <th key={tag} className="px-3 py-2 text-right text-xs font-medium" style={{ color: tagColors[tag] || "#6b7280" }}>
                               {tag}
                             </th>
                           ))}
@@ -394,7 +465,7 @@ export default function Reports() {
                           <tr key={entry.month} className="border-b border-white/5 last:border-0">
                             <td className="px-3 py-2 text-gray-300">{entry.month}</td>
                             <td className="px-3 py-2 text-right font-medium text-white">{entry.count}</td>
-                            {Object.keys(tagColors).slice(0, 6).map((tag) => (
+                            {trendTags.map((tag) => (
                               <td key={tag} className="px-3 py-2 text-right text-gray-400">
                                 {entry.byTag[tag] || 0}
                               </td>
@@ -804,6 +875,181 @@ export default function Reports() {
           )}
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {previewReport && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => setPreviewReport(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/10 bg-[#0f0f23] p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/5 pb-4 mb-5 bg-[#0f0f23]">
+                <div>
+                  <h2 className="text-xl font-bold text-white">
+                    {previewReport.year} {previewReport.quarter} 季度报告快照
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    发送于 {formatDate(previewReport.sentAt)} · 发送人: {previewReport.sentBy}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setPreviewReport(null)}
+                  className="rounded-lg p-2 text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                    <Users className="h-4 w-4 text-amber-400" />
+                    收件人
+                  </h3>
+                  <div className="space-y-1">
+                    {previewReport.recipients.map((r, i) => (
+                      <div key={i} className="flex items-center gap-3 text-sm">
+                        <span className="text-gray-300">{r.name}</span>
+                        <span className="text-gray-500">{r.email}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-white mb-3">统计口径</h3>
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="rounded-lg bg-black/30 p-3 text-center">
+                      <p className="text-xl font-bold text-white">{previewReport.reportData.totalSubmissions}</p>
+                      <p className="text-xs text-gray-500">总提交</p>
+                    </div>
+                    <div className="rounded-lg bg-black/30 p-3 text-center">
+                      <p className="text-xl font-bold text-green-400">{previewReport.reportData.reviewedSubmissions}</p>
+                      <p className="text-xs text-gray-500">已公开</p>
+                    </div>
+                    <div className="rounded-lg bg-black/30 p-3 text-center">
+                      <p className="text-xl font-bold text-yellow-400">{previewReport.reportData.pendingReviewSubmissions}</p>
+                      <p className="text-xs text-gray-500">待审核</p>
+                    </div>
+                    <div className="rounded-lg bg-black/30 p-3 text-center">
+                      <p className="text-xl font-bold text-red-400">{previewReport.reportData.rejectedSubmissions}</p>
+                      <p className="text-xs text-gray-500">已拒绝</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                    <Tag className="h-4 w-4 text-amber-400" />
+                    标签分布明细
+                  </h3>
+                  <div className="space-y-2">
+                    {previewReport.reportData.topTags.map((item, i) => (
+                      <div key={item.tag} className="flex items-center gap-3">
+                        <span className="w-5 text-right text-xs text-gray-500">{i + 1}</span>
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: tagColors[item.tag] || "#6b7280" }} />
+                        <span className="w-20 text-sm text-gray-300">{item.tag}</span>
+                        <div className="relative h-4 flex-1 overflow-hidden rounded bg-white/5">
+                          <div className="absolute inset-y-0 left-0 rounded" style={{ width: `${item.percentage}%`, backgroundColor: tagColors[item.tag] || "#6b7280", opacity: 0.6 }} />
+                        </div>
+                        <span className="w-8 text-right text-sm text-gray-300">{item.count}</span>
+                        <span className="w-10 text-right text-xs text-gray-500">{item.percentage}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                    <BarChart2 className="h-4 w-4 text-amber-400" />
+                    月度趋势（按实际标签）
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-white/5">
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">月份</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">总数</th>
+                          {reportTrendTags.map((tag) => (
+                            <th key={tag} className="px-3 py-2 text-right text-xs font-medium" style={{ color: tagColors[tag] || "#6b7280" }}>
+                              {tag}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {previewReport.reportData.monthlyTrend.map((entry) => (
+                          <tr key={entry.month} className="border-b border-white/5 last:border-0">
+                            <td className="px-3 py-2 text-gray-300">{entry.month}</td>
+                            <td className="px-3 py-2 text-right font-medium text-white">{entry.count}</td>
+                            {reportTrendTags.map((tag) => (
+                              <td key={tag} className="px-3 py-2 text-right text-gray-400">
+                                {entry.byTag[tag] || 0}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-4 w-4 text-yellow-400" />
+                      <h4 className="text-sm font-semibold text-yellow-300">待审核</h4>
+                    </div>
+                    <p className="text-2xl font-bold text-yellow-400">{previewReport.reportData.pendingReviewSubmissions}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {previewReport.reportData.pendingReviewSubmissions > 0
+                        ? "需管理员审核后公开"
+                        : "无待审核内容"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-red-400" />
+                      <h4 className="text-sm font-semibold text-red-300">已拒绝</h4>
+                    </div>
+                    <p className="text-2xl font-bold text-red-400">{previewReport.reportData.rejectedSubmissions}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {previewReport.reportData.rejectedSubmissions > 0
+                        ? "被判定违规已永久屏蔽"
+                        : "无被拒绝内容"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-white/5 flex justify-end gap-3">
+                  <button
+                    onClick={() => handleExportReport(previewReport)}
+                    className="inline-flex items-center gap-2 rounded-lg bg-green-500/15 px-4 py-2 text-sm font-medium text-green-400 hover:bg-green-500/25 transition-colors"
+                  >
+                    <Download className="h-4 w-4" />
+                    导出 JSON
+                  </button>
+                  <button
+                    onClick={() => setPreviewReport(null)}
+                    className="rounded-lg bg-white/5 px-4 py-2 text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors"
+                  >
+                    关闭
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {toast.show && (

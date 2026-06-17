@@ -5,7 +5,7 @@ import { useStore } from "@/store";
 import { tagColors } from "@/data/mock";
 import { formatDate } from "@/utils/format";
 import { cn } from "@/lib/utils";
-import type { Submission } from "@/types";
+import type { Submission, AuditLogEntry } from "@/types";
 
 const container = {
   hidden: { opacity: 0 },
@@ -16,6 +16,85 @@ const cardVariant = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0 },
 };
+
+const actionLabels: Record<AuditLogEntry["action"], string> = {
+  submitted: "匿名提交",
+  approved: "审核通过",
+  rejected: "审核拒绝",
+  replied: "官方回复",
+};
+
+const actionColors: Record<AuditLogEntry["action"], string> = {
+  submitted: "#6b7280",
+  approved: "#22c55e",
+  rejected: "#ef4444",
+  replied: "#f59e0b",
+};
+
+function AuditTimeline({ auditLog }: { auditLog: AuditLogEntry[] }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (auditLog.length <= 1) return null;
+
+  return (
+    <div className="mt-3">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="inline-flex items-center gap-1.5 text-xs text-gray-500 transition-colors hover:text-gray-300"
+      >
+        <Clock className="h-3 w-3" />
+        操作记录 ({auditLog.length})
+        {expanded ? (
+          <ChevronUp className="h-3 w-3" />
+        ) : (
+          <ChevronDown className="h-3 w-3" />
+        )}
+      </button>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="mt-2 overflow-hidden"
+          >
+            <div className="relative pl-4">
+              <div className="absolute left-[5px] top-1.5 bottom-1.5 w-px bg-white/10" />
+              <div className="space-y-2">
+                {auditLog.map((entry, i) => {
+                  const color = actionColors[entry.action];
+                  const isLast = i === auditLog.length - 1;
+                  return (
+                    <div key={i} className="relative flex items-start gap-2">
+                      <span
+                        className="absolute -left-4 top-1 h-2 w-2 rounded-full shrink-0"
+                        style={{ backgroundColor: color, ...(isLast ? { boxShadow: `0 0 4px ${color}40` } : {}) }}
+                      />
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="font-medium" style={{ color }}>
+                          {actionLabels[entry.action]}
+                        </span>
+                        <span className="text-gray-500">
+                          {formatDate(entry.timestamp)}
+                        </span>
+                        {entry.detail && (
+                          <span className="text-gray-600">
+                            · {entry.detail}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 type ViewMode = "all" | "topics";
 
@@ -427,6 +506,8 @@ export default function Square() {
                                   </div>
                                 )}
 
+                                <AuditTimeline auditLog={submission.auditLog} />
+
                                 {replyingId === submission.id && (
                                   <motion.div
                                     initial={{ opacity: 0, height: 0 }}
@@ -650,6 +731,8 @@ export default function Square() {
                                                   </p>
                                                 </div>
                                               )}
+
+                                              <AuditTimeline auditLog={sub.auditLog} />
 
                                               {isAdmin && !sub.adminReply && (
                                                 <div>

@@ -1,4 +1,4 @@
-import type { User, Survey, Submission, Question } from "@/types";
+import type { User, Survey, Submission, Question, AuditLogEntry } from "@/types";
 
 export const mockUsers: User[] = [
   { id: "u1", username: "admin", role: "admin", displayName: "HR 管理员" },
@@ -86,6 +86,10 @@ export const mockSubmissions: Submission[] = [
     status: "visible",
     adminReply: "感谢您的反馈。我们正在推进信息透明化项目，计划下月起每月发布公司战略简报。关于跨部门协作，已安排流程优化小组跟进。",
     repliedAt: "2026-04-06T10:00:00Z",
+    auditLog: [
+      { action: "submitted", timestamp: "2026-04-05T14:30:00Z" },
+      { action: "replied", timestamp: "2026-04-06T10:00:00Z", detail: "管理员公开回复" },
+    ] as AuditLogEntry[],
   },
   {
     id: "sub2",
@@ -98,6 +102,9 @@ export const mockSubmissions: Submission[] = [
     tags: ["管理", "工作环境"],
     submittedAt: "2026-04-08T09:15:00Z",
     status: "visible",
+    auditLog: [
+      { action: "submitted", timestamp: "2026-04-08T09:15:00Z" },
+    ] as AuditLogEntry[],
   },
   {
     id: "sub3",
@@ -111,6 +118,10 @@ export const mockSubmissions: Submission[] = [
     status: "visible",
     adminReply: "已注意到培训需求，Q3将引入外部培训平台，提供更多技术课程选择。",
     repliedAt: "2026-04-12T11:30:00Z",
+    auditLog: [
+      { action: "submitted", timestamp: "2026-04-10T16:45:00Z" },
+      { action: "replied", timestamp: "2026-04-12T11:30:00Z", detail: "管理员公开回复" },
+    ] as AuditLogEntry[],
   },
   {
     id: "sub4",
@@ -123,6 +134,9 @@ export const mockSubmissions: Submission[] = [
     tags: ["福利", "工作环境"],
     submittedAt: "2026-05-20T11:20:00Z",
     status: "visible",
+    auditLog: [
+      { action: "submitted", timestamp: "2026-05-20T11:20:00Z" },
+    ] as AuditLogEntry[],
   },
   {
     id: "sub5",
@@ -137,6 +151,10 @@ export const mockSubmissions: Submission[] = [
     status: "visible",
     adminReply: "已将体检升级和子女教育补贴纳入明年福利方案评估中。",
     repliedAt: "2026-05-24T09:00:00Z",
+    auditLog: [
+      { action: "submitted", timestamp: "2026-05-22T15:00:00Z" },
+      { action: "replied", timestamp: "2026-05-24T09:00:00Z", detail: "管理员公开回复" },
+    ] as AuditLogEntry[],
   },
   {
     id: "sub6",
@@ -151,6 +169,10 @@ export const mockSubmissions: Submission[] = [
     status: "visible",
     adminReply: "我们正在推行工作负载均衡项目，并将在Q2开展创新文化建设试点。",
     repliedAt: "2026-01-18T14:00:00Z",
+    auditLog: [
+      { action: "submitted", timestamp: "2026-01-15T10:30:00Z" },
+      { action: "replied", timestamp: "2026-01-18T14:00:00Z", detail: "管理员公开回复" },
+    ] as AuditLogEntry[],
   },
   {
     id: "sub7",
@@ -162,6 +184,9 @@ export const mockSubmissions: Submission[] = [
     tags: ["文化", "领导力"],
     submittedAt: "2026-02-10T13:00:00Z",
     status: "visible",
+    auditLog: [
+      { action: "submitted", timestamp: "2026-02-10T13:00:00Z" },
+    ] as AuditLogEntry[],
   },
   {
     id: "sub8",
@@ -174,6 +199,9 @@ export const mockSubmissions: Submission[] = [
     submittedAt: "2026-04-15T08:00:00Z",
     status: "pending_review",
     matchedKeywords: ["废物"],
+    auditLog: [
+      { action: "submitted", timestamp: "2026-04-15T08:00:00Z" },
+    ] as AuditLogEntry[],
   },
   {
     id: "sub9",
@@ -187,6 +215,9 @@ export const mockSubmissions: Submission[] = [
     submittedAt: "2026-05-28T16:00:00Z",
     status: "pending_review",
     matchedKeywords: ["白痴"],
+    auditLog: [
+      { action: "submitted", timestamp: "2026-05-28T16:00:00Z" },
+    ] as AuditLogEntry[],
   },
   {
     id: "sub10",
@@ -199,6 +230,9 @@ export const mockSubmissions: Submission[] = [
     tags: ["文化", "工作环境"],
     submittedAt: "2026-02-20T09:30:00Z",
     status: "visible",
+    auditLog: [
+      { action: "submitted", timestamp: "2026-02-20T09:30:00Z" },
+    ] as AuditLogEntry[],
   },
   {
     id: "sub11",
@@ -212,6 +246,10 @@ export const mockSubmissions: Submission[] = [
     status: "visible",
     adminReply: "很好的建议！我们将在下月全员大会引入匿名提问功能。",
     repliedAt: "2026-04-19T15:30:00Z",
+    auditLog: [
+      { action: "submitted", timestamp: "2026-04-18T11:00:00Z" },
+      { action: "replied", timestamp: "2026-04-19T15:30:00Z", detail: "管理员公开回复" },
+    ] as AuditLogEntry[],
   },
 ];
 

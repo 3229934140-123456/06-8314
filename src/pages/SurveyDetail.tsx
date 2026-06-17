@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Shield, Star, ArrowLeft, Send, CheckCircle, Eye } from "lucide-react";
 import { useStore } from "@/store";
 import { allTags, tagColors } from "@/data/mock";
 import { formatDate } from "@/utils/format";
-import { hasUserSubmittedSurvey, getUserSubmissionRecord } from "@/utils/anonymousStorage";
+import { hasUserSubmittedSurvey, getUserSubmissionTime } from "@/utils/anonymousStorage";
 import type { Answer } from "@/types";
 
 export default function SurveyDetail() {
@@ -16,14 +16,15 @@ export default function SurveyDetail() {
   const submitFeedback = useStore((s) => s.submitFeedback);
   const survey = surveys.find((s) => s.id === id);
 
-  const hasSubmitted =
-    currentUser?.role === "employee" && id
-      ? hasUserSubmittedSurvey(currentUser.id, id)
-      : false;
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [submissionTime, setSubmissionTime] = useState<string | undefined>();
 
-  const submissionRecord = currentUser?.role === "employee" && id
-    ? getUserSubmissionRecord(currentUser.id, id)
-    : undefined;
+  useEffect(() => {
+    if (currentUser?.role === "employee" && id) {
+      hasUserSubmittedSurvey(currentUser.id, id).then(setHasSubmitted);
+      getUserSubmissionTime(currentUser.id, id).then(setSubmissionTime);
+    }
+  }, [currentUser, id]);
 
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -38,7 +39,7 @@ export default function SurveyDetail() {
     );
   }
 
-  if (hasSubmitted && submissionRecord) {
+  if (hasSubmitted && submissionTime) {
     return (
       <div className="min-h-screen" style={{ backgroundColor: "#0a0a1a" }}>
         <div className="max-w-2xl mx-auto px-4 py-8">
@@ -84,7 +85,7 @@ export default function SurveyDetail() {
             </p>
             <div className="flex items-center gap-2 text-xs text-gray-500 bg-black/20 px-3 py-1.5 rounded-full">
               <Eye size={14} />
-              <span>提交时间：{formatDate(submissionRecord.submittedAt)}</span>
+              <span>提交时间：{formatDate(submissionTime)}</span>
             </div>
           </motion.div>
 

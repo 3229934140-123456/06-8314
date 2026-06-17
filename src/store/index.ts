@@ -8,11 +8,12 @@ import type {
   SentReport,
   QuarterlyReport,
   ThemeTopic,
+  AuditLogEntry,
 } from "@/types";
 import { mockUsers, mockSurveys, mockSubmissions, allTags } from "@/data/mock";
 import { filterText } from "@/utils/keywordFilter";
 import { generateId } from "@/utils/format";
-import { markSurveySubmitted } from "@/utils/anonymousStorage";
+import { markSurveySubmittedWithTime } from "@/utils/anonymousStorage";
 
 interface PersistState {
   surveys: Survey[];
@@ -159,11 +160,12 @@ export const useStore = create<AppState>()(
           submittedAt: new Date().toISOString(),
           status: flagged ? "pending_review" : "visible",
           matchedKeywords: flagged ? matchedKeywords : undefined,
+          auditLog: [{ action: "submitted", timestamp: new Date().toISOString() }],
         };
 
         const currentUser = get().currentUser;
         if (currentUser && currentUser.role === "employee") {
-          markSurveySubmitted(currentUser.id, data.surveyId);
+          markSurveySubmittedWithTime(currentUser.id, data.surveyId);
         }
 
         set((state) => ({
@@ -177,19 +179,43 @@ export const useStore = create<AppState>()(
       },
 
       reviewSubmission: (id, action, _reason) => {
+        const now = new Date().toISOString();
+        const entry: AuditLogEntry = {
+          action: action === "approve" ? "approved" : "rejected",
+          timestamp: now,
+          detail: action === "approve" ? "审核通过，已公开到意见广场" : "审核拒绝，内容已永久屏蔽",
+        };
         set((state) => ({
           submissions: state.submissions.map((sub) =>
             sub.id === id
-              ? { ...sub, status: action === "approve" ? "visible" : "rejected", matchedKeywords: undefined }
+              ? {
+                  ...sub,
+                  status: action === "approve" ? "visible" : "rejected",
+                  matchedKeywords: undefined,
+                  auditLog: [...(sub.auditLog || []), entry],
+                }
               : sub
           ),
         }));
       },
 
       replyToSubmission: (id, reply) => {
+        const now = new Date().toISOString();
+        const entry: AuditLogEntry = {
+          action: "replied",
+          timestamp: now,
+          detail: "管理员公开回复",
+        };
         set((state) => ({
           submissions: state.submissions.map((sub) =>
-            sub.id === id ? { ...sub, adminReply: reply, repliedAt: new Date().toISOString() } : sub
+            sub.id === id
+              ? {
+                  ...sub,
+                  adminReply: reply,
+                  repliedAt: now,
+                  auditLog: [...(sub.auditLog || []), entry],
+                }
+              : sub
           ),
         }));
       },

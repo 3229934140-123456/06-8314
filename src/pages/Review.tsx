@@ -4,7 +4,7 @@ import { ShieldAlert, ShieldCheck, CheckCircle, XCircle, Clock, Eye, EyeOff, Ale
 import { useStore } from "@/store";
 import { formatDate } from "@/utils/format";
 import { tagColors } from "@/data/mock";
-import type { Submission } from "@/types";
+import type { Submission, AuditLogEntry } from "@/types";
 
 function TagBadge({ tag }: { tag: string }) {
   const color = tagColors[tag] ?? "#6b7280";
@@ -64,6 +64,81 @@ function AnswerBlock({ answer, keywords }: { answer: Submission["answers"][numbe
       <p className="text-sm leading-relaxed text-gray-300">
         <HighlightedText text={answer.textValue ?? ""} keywords={keywords} />
       </p>
+    </div>
+  );
+}
+
+const auditActionLabels: Record<AuditLogEntry["action"], string> = {
+  submitted: "匿名提交",
+  approved: "审核通过",
+  rejected: "审核拒绝",
+  replied: "官方回复",
+};
+
+const auditActionColors: Record<AuditLogEntry["action"], string> = {
+  submitted: "bg-gray-400",
+  approved: "bg-green-400",
+  rejected: "bg-red-400",
+  replied: "bg-amber-400",
+};
+
+function AuditTimeline({ auditLog }: { auditLog: AuditLogEntry[] }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (auditLog.length <= 1) return null;
+
+  return (
+    <div className="mt-3 rounded-lg bg-[#1a1a2e] p-3">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-300 transition-colors"
+      >
+        <motion.span
+          animate={{ rotate: expanded ? 90 : 0 }}
+          transition={{ duration: 0.15 }}
+          className="inline-block"
+        >
+          ▸
+        </motion.span>
+        审核记录 ({auditLog.length})
+      </button>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-2 space-y-0">
+              {auditLog.map((entry, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <div className="relative flex flex-col items-center">
+                    <span
+                      className={`mt-1 h-2 w-2 shrink-0 rounded-full ${auditActionColors[entry.action]}`}
+                    />
+                    {i < auditLog.length - 1 && (
+                      <span className="w-px flex-1 bg-white/10" style={{ minHeight: 16 }} />
+                    )}
+                  </div>
+                  <div className="pb-3">
+                    <span className="text-xs text-gray-300">
+                      {auditActionLabels[entry.action]}
+                    </span>
+                    <span className="ml-2 text-xs text-gray-500">
+                      {formatDate(entry.timestamp)}
+                    </span>
+                    {entry.detail && (
+                      <p className="mt-0.5 text-xs text-gray-500">{entry.detail}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -221,6 +296,8 @@ export default function Review() {
                       ))}
                     </div>
 
+                    <AuditTimeline auditLog={sub.auditLog} />
+
                     <div className="mb-4 flex flex-wrap gap-1.5">
                       {sub.tags.map((tag) => (
                         <TagBadge key={tag} tag={tag} />
@@ -292,6 +369,7 @@ export default function Review() {
                       <TagBadge key={tag} tag={tag} />
                     ))}
                   </div>
+                  <AuditTimeline auditLog={sub.auditLog} />
                 </motion.div>
               ))}
             </div>
