@@ -64,7 +64,42 @@ export interface QuarterlyReport {
   totalSubmissions: number;
   reviewedSubmissions: number;
   rejectedSubmissions: number;
+  pendingReviewSubmissions: number;
   categoryBreakdown: { tag: string; count: number }[];
   monthlyTrend: { month: string; count: number; byTag: Record<string, number> }[];
   topTags: { tag: string; count: number; percentage: number }[];
+}
+
+export interface EmployeeSubmissionRecord {
+  id: string;
+  employeeId: string;
+  surveyId: string;
+  submittedAt: string;
+}
+
+export interface ReportRecipient {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+export interface SentReport {
+  id: string;
+  quarter: string;
+  year: number;
+  sentAt: string;
+  sentBy: string;
+  recipients: { name: string; email: string }[];
+  reportData: QuarterlyReport;
+  status: "sent" | "failed";
+}
+
+export interface ThemeTopic {
+  id: string;
+  tag: string;
+  keywordGroup: string[];
+  relatedSubmissionIds: string[];
+  count: number;
+  replyCount: number;
 }

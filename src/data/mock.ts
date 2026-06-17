@@ -227,3 +227,12 @@ export const tagColors: Record<string, string> = {
   "领导力": "#06b6d4",
   "设施": "#84cc16",
 };
+
+export const reportRecipients = [
+  { id: "r1", name: "CEO 张明", email: "ceo@company.com", role: "管理层" },
+  { id: "r2", name: "COO 李华", email: "coo@company.com", role: "管理层" },
+  { id: "r3", name: "HRD 王芳", email: "hrd@company.com", role: "人力资源" },
+  { id: "r4", name: "技术总监 陈强", email: "cto@company.com", role: "管理层" },
+  { id: "r5", name: "运营总监 刘敏", email: "coo2@company.com", role: "管理层" },
+  { id: "r6", name: "全体高管", email: "exec-team@company.com", role: "高管组" },
+];

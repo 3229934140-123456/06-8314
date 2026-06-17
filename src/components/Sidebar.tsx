@@ -8,6 +8,7 @@ import {
   BarChart3,
   LogOut,
   X,
+  Settings,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useStore } from "@/store";
@@ -29,6 +30,7 @@ const adminNavItems: NavItem[] = [
   { to: "/square", icon: MessageSquare, label: "意见广场" },
   { to: "/review", icon: ShieldAlert, label: "内容审核" },
   { to: "/reports", icon: BarChart3, label: "统计报告" },
+  { to: "/settings", icon: Settings, label: "数据管理" },
 ];
 
 const employeeNavItems: NavItem[] = [

@@ -8,6 +8,7 @@ import SurveyDetail from "@/pages/SurveyDetail";
 import Square from "@/pages/Square";
 import Review from "@/pages/Review";
 import Reports from "@/pages/Reports";
+import Settings from "@/pages/Settings";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const currentUser = useStore((s) => s.currentUser);
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="/square" element={<Square />} />
           <Route path="/review" element={<AdminRoute><Review /></AdminRoute>} />
           <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
+          <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
         </Route>
       </Routes>
     </Router>

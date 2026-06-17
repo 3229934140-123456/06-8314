@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Navigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart3,
   MessageSquare,
@@ -9,6 +9,13 @@ import {
   XCircle,
   TrendingUp,
   TrendingDown,
+  Mail,
+  Users,
+  CheckCircle,
+  History,
+  ChevronDown,
+  ChevronUp,
+  Send,
 } from "lucide-react";
 import {
   LineChart,
@@ -24,7 +31,9 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useStore } from "@/store";
-import { tagColors } from "@/data/mock";
+import { tagColors, reportRecipients } from "@/data/mock";
+import { formatDate } from "@/utils/format";
+import type { SentReport } from "@/types";
 
 interface QuarterInfo {
   label: string;
@@ -78,11 +87,19 @@ function calcPercentChange(current: number, previous: number): number | null {
 export default function Reports() {
   const currentUser = useStore((s) => s.currentUser);
   const submissions = useStore((s) => s.submissions);
+  const sentReports = useStore((s) => s.sentReports);
+  const sendReport = useStore((s) => s.sendReport);
 
+  const [activeTab, setActiveTab] = useState<"overview" | "history">("overview");
   const quarters = useMemo(() => getRecentQuarters(4), []);
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [sendQuarterIdx, setSendQuarterIdx] = useState(0);
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
+  const [recipientDropdown, setRecipientDropdown] = useState(false);
+  const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: "" });
 
   const selectedQuarter = quarters[selectedIdx];
+  const sendQuarter = quarters[sendQuarterIdx];
 
   const quarterSubmissions = useMemo(
     () =>
@@ -185,6 +202,115 @@ export default function Reports() {
 
   const chartTags = Object.keys(tagColors);
 
+  const handleToggleRecipient = (id: string) => {
+    setSelectedRecipients((prev) =>
+      prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedRecipients.length === reportRecipients.length) {
+      setSelectedRecipients([]);
+    } else {
+      setSelectedRecipients(reportRecipients.map((r) => r.id));
+    }
+  };
+
+  const handleSendReport = () => {
+    if (selectedRecipients.length === 0) {
+      setToast({ show: true, message: "请至少选择一个收件人" });
+      setTimeout(() => setToast({ show: false, message: "" }), 3000);
+      return;
+    }
+
+    const recipients = reportRecipients
+      .filter((r) => selectedRecipients.includes(r.id))
+      .map(({ name, email }) => ({ name, email }));
+
+    sendReport({
+      year: sendQuarter.year,
+      quarter: sendQuarter.quarter,
+      recipients,
+    });
+
+    setToast({ show: true, message: "报告发送成功！" });
+    setSelectedRecipients([]);
+    setRecipientDropdown(false);
+    setTimeout(() => setToast({ show: false, message: "" }), 3000);
+  };
+
+  const renderReportCard = (report: SentReport, index: number) => {
+    const { reportData } = report;
+    const recipientsText = report.recipients.map((r) => r.name).join(", ");
+    const truncatedRecipients = recipientsText.length > 50
+      ? recipientsText.substring(0, 50) + "..."
+      : recipientsText;
+
+    return (
+      <motion.div
+        key={report.id}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        transition={{ delay: index * 0.08 }}
+        className="rounded-xl border border-white/5 bg-[#0f0f23] p-5"
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <h3 className="text-lg font-semibold text-white">{report.year} {report.quarter}</h3>
+              <span className="flex items-center gap-1 rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-medium text-green-400">
+                <CheckCircle className="h-3 w-3" />
+                已发送
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-gray-500">{formatDate(report.sentAt)}</p>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          <div className="flex items-start gap-2">
+            <Users className="mt-0.5 h-4 w-4 text-gray-500" />
+            <div>
+              <p className="text-xs text-gray-500">发送人</p>
+              <p className="text-sm text-gray-300">{report.sentBy}</p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2">
+            <Mail className="mt-0.5 h-4 w-4 text-gray-500" />
+            <div>
+              <p className="text-xs text-gray-500">收件人</p>
+              <p className="text-sm text-gray-300">{truncatedRecipients}</p>
+              <p className="text-xs text-gray-500">
+                {report.recipients.map((r) => r.email).join(", ")}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-4 gap-3 border-t border-white/5 pt-4">
+            <div className="text-center">
+              <p className="text-xl font-semibold text-white">{reportData.totalSubmissions}</p>
+              <p className="text-xs text-gray-500">总提交</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xl font-semibold text-green-400">{reportData.reviewedSubmissions}</p>
+              <p className="text-xs text-gray-500">已公开</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xl font-semibold text-yellow-400">{reportData.pendingReviewSubmissions}</p>
+              <p className="text-xs text-gray-500">待审核</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xl font-semibold text-red-400">{reportData.rejectedSubmissions}</p>
+              <p className="text-xs text-gray-500">已拒绝</p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0a1a] px-4 py-8 text-gray-100 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
@@ -193,163 +319,346 @@ export default function Reports() {
           <h1 className="text-2xl font-bold text-white">统计报告</h1>
         </div>
 
-        <div className="mb-6 flex gap-1 rounded-lg bg-[#0f0f23] p-1">
-          {quarters.map((q, i) => (
-            <button
-              key={q.label}
-              onClick={() => setSelectedIdx(i)}
-              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-                selectedIdx === i
-                  ? "bg-amber-500 text-black"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              {q.label}
-            </button>
-          ))}
+        <div className="mb-6 inline-flex gap-1 rounded-lg bg-[#0f0f23] p-1">
+          <button
+            onClick={() => setActiveTab("overview")}
+            className={`flex items-center gap-2 rounded-md px-5 py-2 text-sm font-medium transition-colors ${
+              activeTab === "overview"
+                ? "bg-amber-500 text-black"
+                : "text-gray-400 hover:text-white"
+            }`}
+          >
+            <BarChart3 className="h-4 w-4" />
+            数据概览
+          </button>
+          <button
+            onClick={() => setActiveTab("history")}
+            className={`flex items-center gap-2 rounded-md px-5 py-2 text-sm font-medium transition-colors ${
+              activeTab === "history"
+                ? "bg-amber-500 text-black"
+                : "text-gray-400 hover:text-white"
+            }`}
+          >
+            <History className="h-4 w-4" />
+            发送历史
+          </button>
         </div>
 
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {statCards.map((card, i) => {
-            const colors = colorMap[card.color];
-            const change = calcPercentChange(card.count, card.prev);
-            const Icon = card.icon;
-            return (
+        <AnimatePresence mode="wait">
+          {activeTab === "overview" && (
+            <motion.div
+              key="overview"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="mb-6 flex gap-1 rounded-lg bg-[#0f0f23] p-1">
+                {quarters.map((q, i) => (
+                  <button
+                    key={q.label}
+                    onClick={() => setSelectedIdx(i)}
+                    className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                      selectedIdx === i
+                        ? "bg-amber-500 text-black"
+                        : "text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    {q.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {statCards.map((card, i) => {
+                  const colors = colorMap[card.color];
+                  const change = calcPercentChange(card.count, card.prev);
+                  const Icon = card.icon;
+                  return (
+                    <motion.div
+                      key={card.label}
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.08 }}
+                      className="rounded-xl border border-white/5 bg-[#0f0f23] p-5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${colors.iconBg}`}>
+                          <Icon className={`h-5 w-5 ${colors.iconText}`} />
+                        </div>
+                        {change !== null && (
+                          <span className={`flex items-center gap-0.5 text-xs font-medium ${change >= 0 ? colors.trendUp : colors.trendDown}`}>
+                            {change >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                            {Math.abs(change)}%
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-3 text-sm text-gray-400">{card.label}</p>
+                      <p className="text-2xl font-semibold text-white">{card.count}</p>
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="rounded-xl border border-white/5 bg-[#0f0f23] p-5 lg:col-span-2"
+                >
+                  <h2 className="mb-4 text-base font-semibold text-white">月度趋势</h2>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={monthlyTrend}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                      <XAxis dataKey="month" stroke="#6b7280" tick={{ fontSize: 12 }} />
+                      <YAxis stroke="#6b7280" tick={{ fontSize: 12 }} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#1a1a3e",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          borderRadius: "8px",
+                          color: "#e5e7eb",
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      {chartTags.map((tag) => (
+                        <Line
+                          key={tag}
+                          type="monotone"
+                          dataKey={tag}
+                          stroke={tagColors[tag]}
+                          strokeWidth={2}
+                          dot={{ r: 3, fill: tagColors[tag] }}
+                          activeDot={{ r: 5 }}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="rounded-xl border border-white/5 bg-[#0f0f23] p-5"
+                >
+                  <h2 className="mb-4 text-base font-semibold text-white">标签分布</h2>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={tagDistribution}
+                        dataKey="count"
+                        nameKey="tag"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={2}
+                        label={({ tag, percent }) => `${tag} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {tagDistribution.map((entry) => (
+                          <Cell key={entry.tag} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#1a1a3e",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          borderRadius: "8px",
+                          color: "#e5e7eb",
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </motion.div>
+              </div>
+
               <motion.div
-                key={card.label}
-                initial={{ opacity: 0, y: 16 }}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.08 }}
+                transition={{ delay: 0.5 }}
+                className="mb-6 rounded-xl border border-white/5 bg-[#0f0f23] p-5"
+              >
+                <h2 className="mb-4 text-base font-semibold text-white">热门标签排行</h2>
+                {topTags.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-gray-500">暂无数据</p>
+                ) : (
+                  <div className="space-y-3">
+                    {topTags.map((item, i) => (
+                      <div key={item.tag} className="flex items-center gap-3">
+                        <span className="w-5 text-right text-xs font-medium text-gray-500">{i + 1}</span>
+                        <span
+                          className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <span className="w-16 text-sm text-gray-300">{item.tag}</span>
+                        <div className="relative h-6 flex-1 overflow-hidden rounded bg-white/5">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${item.percentage}%` }}
+                            transition={{ duration: 0.6, delay: 0.6 + i * 0.05 }}
+                            className="absolute inset-y-0 left-0 rounded"
+                            style={{ backgroundColor: item.color, opacity: 0.7 }}
+                          />
+                        </div>
+                        <span className="w-8 text-right text-sm font-medium text-gray-300">{item.count}</span>
+                        <span className="w-10 text-right text-xs text-gray-500">{item.percentage}%</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
                 className="rounded-xl border border-white/5 bg-[#0f0f23] p-5"
               >
-                <div className="flex items-center justify-between">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${colors.iconBg}`}>
-                    <Icon className={`h-5 w-5 ${colors.iconText}`} />
-                  </div>
-                  {change !== null && (
-                    <span className={`flex items-center gap-0.5 text-xs font-medium ${change >= 0 ? colors.trendUp : colors.trendDown}`}>
-                      {change >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                      {Math.abs(change)}%
-                    </span>
-                  )}
+                <div className="mb-4 flex items-center gap-2">
+                  <Send className="h-5 w-5 text-amber-400" />
+                  <h2 className="text-base font-semibold text-white">发送季度报告</h2>
                 </div>
-                <p className="mt-3 text-sm text-gray-400">{card.label}</p>
-                <p className="text-2xl font-semibold text-white">{card.count}</p>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-400">选择季度</label>
+                    <div className="flex gap-1 rounded-lg bg-black/30 p-1">
+                      {quarters.map((q, i) => (
+                        <button
+                          key={q.label}
+                          onClick={() => setSendQuarterIdx(i)}
+                          className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                            sendQuarterIdx === i
+                              ? "bg-amber-500 text-black"
+                              : "text-gray-400 hover:text-white"
+                          }`}
+                        >
+                          {q.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-400">选择收件人</label>
+                    <div className="relative">
+                      <button
+                        onClick={() => setRecipientDropdown(!recipientDropdown)}
+                        className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-black/30 px-3 py-2.5 text-left text-sm text-gray-300 hover:border-white/20"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-gray-500" />
+                          {selectedRecipients.length === 0
+                            ? "请选择收件人"
+                            : `已选择 ${selectedRecipients.length} 人`}
+                        </span>
+                        {recipientDropdown ? (
+                          <ChevronUp className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-gray-500" />
+                        )}
+                      </button>
+
+                      <AnimatePresence>
+                        {recipientDropdown && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-lg border border-white/10 bg-[#1a1a3e] p-2 shadow-xl"
+                          >
+                            <div className="mb-2 border-b border-white/10 pb-2">
+                              <button
+                                onClick={handleSelectAll}
+                                className="w-full px-2 py-1.5 text-left text-xs text-gray-400 hover:bg-white/5 rounded"
+                              >
+                                {selectedRecipients.length === reportRecipients.length
+                                  ? "取消全选"
+                                  : "全选"}
+                              </button>
+                            </div>
+                            {reportRecipients.map((recipient) => (
+                              <label
+                                key={recipient.id}
+                                className="flex items-start gap-3 rounded-md px-2 py-2 cursor-pointer hover:bg-white/5"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selectedRecipients.includes(recipient.id)}
+                                  onChange={() => handleToggleRecipient(recipient.id)}
+                                  className="mt-1 h-4 w-4 rounded border-gray-600 bg-black/30 text-amber-500 focus:ring-amber-500"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-200">{recipient.name}</p>
+                                  <p className="text-xs text-gray-500">{recipient.email}</p>
+                                  <p className="text-xs text-gray-600">{recipient.role}</p>
+                                </div>
+                              </label>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSendReport}
+                    disabled={selectedRecipients.length === 0}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-sm font-semibold text-black transition-all hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Send className="h-4 w-4" />
+                    发送报告
+                  </button>
+                </div>
               </motion.div>
-            );
-          })}
-        </div>
-
-        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="rounded-xl border border-white/5 bg-[#0f0f23] p-5 lg:col-span-2"
-          >
-            <h2 className="mb-4 text-base font-semibold text-white">月度趋势</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="month" stroke="#6b7280" tick={{ fontSize: 12 }} />
-                <YAxis stroke="#6b7280" tick={{ fontSize: 12 }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#1a1a3e",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: "8px",
-                    color: "#e5e7eb",
-                  }}
-                />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                {chartTags.map((tag) => (
-                  <Line
-                    key={tag}
-                    type="monotone"
-                    dataKey={tag}
-                    stroke={tagColors[tag]}
-                    strokeWidth={2}
-                    dot={{ r: 3, fill: tagColors[tag] }}
-                    activeDot={{ r: 5 }}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="rounded-xl border border-white/5 bg-[#0f0f23] p-5"
-          >
-            <h2 className="mb-4 text-base font-semibold text-white">标签分布</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={tagDistribution}
-                  dataKey="count"
-                  nameKey="tag"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={2}
-                  label={({ tag, percent }) => `${tag} ${(percent * 100).toFixed(0)}%`}
-                >
-                  {tagDistribution.map((entry) => (
-                    <Cell key={entry.tag} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#1a1a3e",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: "8px",
-                    color: "#e5e7eb",
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </motion.div>
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="rounded-xl border border-white/5 bg-[#0f0f23] p-5"
-        >
-          <h2 className="mb-4 text-base font-semibold text-white">热门标签排行</h2>
-          {topTags.length === 0 ? (
-            <p className="py-8 text-center text-sm text-gray-500">暂无数据</p>
-          ) : (
-            <div className="space-y-3">
-              {topTags.map((item, i) => (
-                <div key={item.tag} className="flex items-center gap-3">
-                  <span className="w-5 text-right text-xs font-medium text-gray-500">{i + 1}</span>
-                  <span
-                    className="h-2.5 w-2.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: item.color }}
-                  />
-                  <span className="w-16 text-sm text-gray-300">{item.tag}</span>
-                  <div className="relative h-6 flex-1 overflow-hidden rounded bg-white/5">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${item.percentage}%` }}
-                      transition={{ duration: 0.6, delay: 0.6 + i * 0.05 }}
-                      className="absolute inset-y-0 left-0 rounded"
-                      style={{ backgroundColor: item.color, opacity: 0.7 }}
-                    />
-                  </div>
-                  <span className="w-8 text-right text-sm font-medium text-gray-300">{item.count}</span>
-                  <span className="w-10 text-right text-xs text-gray-500">{item.percentage}%</span>
-                </div>
-              ))}
-            </div>
+            </motion.div>
           )}
-        </motion.div>
+
+          {activeTab === "history" && (
+            <motion.div
+              key="history"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              {sentReports.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-xl border border-white/5 bg-[#0f0f23] p-12 text-center"
+                >
+                  <History className="mx-auto h-12 w-12 text-gray-600" />
+                  <h3 className="mt-4 text-lg font-medium text-gray-400">暂无发送历史</h3>
+                  <p className="mt-2 text-sm text-gray-600">您发送的季度报告将显示在这里</p>
+                </motion.div>
+              ) : (
+                <div className="space-y-4">
+                  <AnimatePresence>
+                    {sentReports.map((report, i) => renderReportCard(report, i))}
+                  </AnimatePresence>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {toast.show && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-green-500/90 px-4 py-3 text-sm font-medium text-white shadow-lg backdrop-blur"
+          >
+            <CheckCircle className="h-4 w-4" />
+            {toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
